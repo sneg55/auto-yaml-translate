@@ -59,6 +59,11 @@
     var resultField;
 
     /**
+     * an array of all place holder entries in the string current being translated
+     */
+    var placeHolderList;
+
+    /**
      * init mark the system is ready
      */
     google.setOnLoadCallback(
@@ -162,8 +167,21 @@
 
     function padTranslatedResult(content)
     {
+
+        if(placeHolderList.length > 0)
+        {
+            var count = 0;
+            content.gsub('（ （ ） ）',function(match)
+                {
+                    return "{{"+placeHolderList[count++]+"}}"
+                }
+            );
+            placeHolderList = [];
+        }
+
         resultField.value += content + '"';
-        translateLine();
+
+        translateLine(); 
     }
 
 
@@ -182,6 +200,14 @@
      */
     function gTranslate(text)
     {
+        // take out all place holder strings
+        placeHolderList = [];
+        text.scan(/\{\{(.*?)\}\}/, function(match){placeHolderList.push(match[1])})
+
+        // debugger;
+        // dir(placeHolderList);
+
+        // call google translate service
         google.language.translate(text, "en", "zh-CN",  function(result)
         {
             var translated = document.getElementById("translation");
