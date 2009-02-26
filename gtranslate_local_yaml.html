@@ -13,6 +13,15 @@
             padding: 10px;
         }
 
+        select,
+        input{
+            padding: 10px;
+            background-color:white;
+            border: 1px solid grey;
+            color:black;
+            -moz-border-radius: 10px;
+        }
+
         th{
             height:1;
         }
@@ -43,6 +52,11 @@
 
         .title {
             font-size:1.5em;
+        }
+
+        .button{
+            background-color:#FFC;
+            font-weight:bolder;
         }
     </style>
 
@@ -79,6 +93,16 @@
             resultField = $("result_field");
             resultField.value = "";
             // $("source_content").value = "";
+
+            // populate target languages
+            var values = Object.values(google.language.Languages);
+            var keys = Object.keys(google.language.Languages);
+            for(var i = 0; i<keys.length; i++)
+            {
+                values[i] = '<option value="'+values[i]+'">'+keys[i]+'('+values[i]+')'+'</option>'
+            }
+
+            $("language_select").update(values.join(' '));
         }
     );
 
@@ -204,7 +228,7 @@
 
         text = text.gsub(/\{\{(.*?)\}\}/, '<span class="notranslate">{{#{1}}}</span>')
 
-        google.language.translate(text, "en", "zh-CN",  function(result)
+        google.language.translate(text, "en", $F("language_select"),  function(result)
         {
             var translated = document.getElementById("translation");
             if (result.translation) {
@@ -212,7 +236,7 @@
             }
             else
             {
-                padTranslatedResult("ERROR! fail to translate this entry.");
+                padTranslatedResult("ERROR!"+ result.error.message +"(code:"+result.error.code+")");
             }
         });
     }
@@ -231,8 +255,9 @@
 
 <form action="js_translate">
 <dir>
-    Target language: 
-    <input type="button" value="Translate" name="translate_btn" onclick="doTranslate()"/>
+    Target language:
+    <select name="language_select" id="language_select"></select>
+    <input type="button" value="Translate" name="translate_btn" class="button" onclick="doTranslate()"/>
     
 </dir>
 <table border="0" cellspacing="0" cellpadding="10" width="100%">
