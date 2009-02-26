@@ -85,6 +85,11 @@
     var resultField;
 
     /**
+     * the language code of source content
+     */
+    var sourceLanguageCode = null;
+
+    /**
      * init mark the system is ready
      */
     google.setOnLoadCallback(
@@ -134,11 +139,9 @@
         sourceLines = source_content.split('\n');
         currentLineNumber= 0;
         resultField.value = "";
-        
-        translateLine();
-        
-        updateStatus("Translating...".bold().fontcolor("green").blink());
 
+        detectLanguage();
+        
         return false;
     }
 
@@ -157,34 +160,100 @@
         // get the current line content
         var currentLine = sourceLines[currentLineNumber++];
 
-        // is this a valid key:value line
-        if(currentLine.indexOf(':') == -1)
+        var lineObj = extractContent(currentLine);
+
+        if(!lineObj)
         {
             addTranslatedResult(currentLine);
             translateLine();
             return;
+        }
+
+        addTranslatedResult(lineObj.leadingSpaces+lineObj.key+':"');
+        gTranslate(lineObj.content);
+    }
+
+    /**
+     * detect the language code of the source content
+     */
+    function detectLanguage()
+    {
+        for(var i=0; i<sourceLines.length; i++)
+        {
+            var lineObj = extractContent(sourceLines[i]);
+            if(!lineObj)
+            {
+                continue;
+            }
+            else
+            {
+                google.language.detect(lineObj.content, 
+                    function(result)
+                    {
+                        if (result.error)
+                        {
+                            updateStatus("Translation failed, please try again".bold());
+                            reportFailure("can not detect the language of the source YMAL");
+                        }
+                        else
+                        {
+                            sourceLanguageCode = result.language;
+                            updateStatus(("Translating ("+sourceLanguageCode+">"+
+                                $F("language_select")+") ...").bold().fontcolor("green").blink());
+                            translateLine();
+                        }
+                    }
+                );
+                break;
+            }
+
+        }
+
+        return false;
+        sourceLanguageCode
+    }
+
+    /**
+     * extract content string from a line of yaml code
+     *
+     * @param line [String] a line of yaml code
+     *
+     * @return [{leadingSpaces:String, key:String, content:String}] extracted content string.
+     *         If not content string can be extracted, then return null
+     */
+    function extractContent(line)
+    {
+        // is this a valid key:value line
+        if(line.indexOf(':') == -1)
+        {
+            return null;
         }
 
         // is this a valid key:value line, again
-        var strippedLine = currentLine.strip();
+        var strippedLine = line.strip();
         if(strippedLine.lastIndexOf(':') == strippedLine.length -1)
         {
-            addTranslatedResult(currentLine);
-            translateLine();
-            return;
+            return null
         }
 
+        var lineObj = {}
+
         // translate this line
-        currentLine.sub(/\s+(.*?)\:\s+\"(.*?)\"/,  function(match)
+        line.scan(/\s+(.*?)\:\s+\"(.*?)\"/,  function(match)
             {
                 // get leading spaces
                 var firstHalf = match[0].split(':')[0];
                 var leadingSpaces = ' '.times(firstHalf.lastIndexOf(' ') + 1);
-                addTranslatedResult(leadingSpaces+match[1]+':"');
-                gTranslate(match[2]);
-                return '';
+              
+                lineObj = {
+                    leadingSpaces:' '.times(firstHalf.lastIndexOf(' ') + 1),
+                    key:match[1],
+                    content:match[2]
+                }
             }
         )
+
+        return lineObj;
     }
 
     /**
@@ -228,7 +297,14 @@
 
         text = text.gsub(/\{\{(.*?)\}\}/, '<span class="notranslate">{{#{1}}}</span>')
 
-        google.language.translate(text, "en", $F("language_select"),  function(result)
+        if (!sourceLanguageCode || !$F("language_select"))
+        {
+            updateStatus("Translation halted.".bold());
+            reportFailure("missing source language code or target language code.");
+            return;
+        }
+
+        google.language.translate(text, sourceLanguageCode, $F("language_select"),  function(result)
         {
             var translated = document.getElementById("translation");
             if (result.translation) {
